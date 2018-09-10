@@ -1,0 +1,256 @@
+/* 
+ * File:   main.cpp
+ * Author: Manish
+ *
+ * Created on May 25, 2010, 10:30 AM
+ */
+
+#include "SXMerge.h"
+
+/*
+ * 
+ */
+
+SNP_LIST g_SNPList;
+FILE *g_pfFile1, *g_pfFile2, *g_pfCommon, *g_pfUnique1, *g_pfUnique2;
+
+
+void GenerateSNPList()
+{
+    fprintf(stdout,"GenerateSNPList\n");
+    char acbuf[1024]; char *pChr=NULL; stKey *pstKey=NULL; stData *pstData=NULL;
+    SNP_LIST::iterator itr=NULL;
+    unsigned long ulTest1,ulTest2; ulTest1=ulTest2=0;
+
+    while(!feof(g_pfFile1))
+    {
+        ulTest1++;
+        if (ulTest1 == 1000000)
+        {
+            ulTest2++;
+            fprintf(stderr,"GenerateSNPList-Total Recs Processed = %u M\n", ulTest2);
+            ulTest1=0;
+        }
+
+        if (!fgets(acbuf,sizeof(acbuf),g_pfFile1)){break;}
+
+        pChr = strchr(acbuf,'\r'); if (pChr) {*pChr='\0';}
+        pChr = strchr(acbuf,'\n'); if (pChr) {*pChr='\0';}
+
+        if (acbuf[0] == '\0'||acbuf[0] == '#'||acbuf[0] == 'C')
+           continue;
+
+        pstKey = new stKey;
+
+        pChr = strtok(acbuf,"\t");
+
+        if (!isalpha(pChr[0])) pstKey->cChromosome = atoi(pChr);
+        else if (pChr[0]=='X') pstKey->cChromosome = 23;
+        else if(pChr[0]=='Y') pstKey->cChromosome = 24;
+
+        pChr = strtok(NULL,"\t"); pstKey->nOffset = atoi(pChr);
+        pChr = strtok(NULL,"\t"); strcpy(pstKey->acAllele,pChr);
+        
+        pstData = new stData;
+        pChr = strtok(NULL,"\t"); pstData->nSNPCnt = atoi(pChr);
+        pChr = strtok(NULL,"\t");  pstData->nReadDensity = atoi(pChr);
+        pChr = strtok(NULL,"\t");  pstData->fAvgQScore = atof(pChr);
+        pChr = strtok(NULL,"\t"); pstData->pcdbSNP = new char[strlen(pChr)+1];
+        strcpy(pstData->pcdbSNP,pChr);
+
+        g_SNPList[pstKey]=pstData;   
+    }
+}
+
+
+void AnalyseSNPData()
+{
+    fprintf(stdout,"AnalyseSNPData\n");   
+    char acbuf[1024]; char *pChr=NULL; stKey *pstKey=NULL; stData *pstData=NULL;
+    SNP_LIST::iterator itr=NULL;
+    unsigned long ulTest1,ulTest2; ulTest1=ulTest2=0;  
+    int nReadStrength;
+
+    while(!feof(g_pfFile2))
+    {
+        ulTest1++;
+        if (ulTest1 == 1000000)
+        {
+            ulTest2++;
+            fprintf(stderr,"AnalyseSNPData-Total Recs Processed = %u M\n", ulTest2);
+            ulTest1=0;
+        }
+
+        if (!fgets(acbuf,sizeof(acbuf),g_pfFile2)){break;}
+      
+        pChr = strchr(acbuf,'\r'); if (pChr) {*pChr='\0';}
+        pChr = strchr(acbuf,'\n'); if (pChr) {*pChr='\0';}
+
+        if (acbuf[0] == '\0'||acbuf[0] == '#'||acbuf[0] == 'C')
+           continue;
+
+        pstKey = new stKey;
+
+        pChr = strtok(acbuf,"\t");
+
+        if (!isalpha(pChr[0])) pstKey->cChromosome = atoi(pChr);
+        else if (pChr[0]=='X') pstKey->cChromosome = 23;
+        else if(pChr[0]=='Y') pstKey->cChromosome = 24;
+
+        pChr = strtok(NULL,"\t"); pstKey->nOffset = atoi(pChr);
+        pChr = strtok(NULL,"\t"); strcpy(pstKey->acAllele,pChr);
+
+        pstData = new stData;
+
+        pChr = strtok(NULL,"\t"); pstData->nSNPCnt = atoi(pChr);
+        pChr = strtok(NULL,"\t");  pstData->nReadDensity = atoi(pChr);
+        pChr = strtok(NULL,"\t");  pstData->fAvgQScore = atof(pChr);
+
+        itr = g_SNPList.find(pstKey);
+
+
+        if (itr==g_SNPList.end()){
+            pChr = strtok(NULL,"\t"); pstData->pcdbSNP = new char[strlen(pChr)+1];
+            strcpy(pstData->pcdbSNP,pChr);
+
+            if (pstKey->cChromosome < 23) fprintf(g_pfUnique2,"%d\t",pstKey->cChromosome);
+            else if(pstKey->cChromosome == 23) fprintf(g_pfUnique2,"X\t");
+            else fprintf(g_pfUnique2,"Y\t");
+            
+             if (pstData->nReadDensity == 0) nReadStrength = 101;
+             else nReadStrength = (int)(pstData->nSNPCnt*100/pstData->nReadDensity+0.5); 
+
+            fprintf(g_pfUnique2,"%d\t%s\t-\t%d\t%d\t-\t%d\t%d\t-\t%.2f\t%.2f\t%s\t%d\n",
+                    pstKey->nOffset,pstKey->acAllele,pstData->nSNPCnt,pstData->nSNPCnt,
+                    pstData->nReadDensity,pstData->nReadDensity,pstData->fAvgQScore,
+                    pstData->fAvgQScore,pstData->pcdbSNP,nReadStrength);//(int)(pstData->nSNPCnt*100/pstData->nReadDensity+0.5));
+        }
+        else{
+            (*itr->second).bUnique = false;
+            (*itr->second).nSNPCnt2 = pstData->nSNPCnt;
+            (*itr->second).nReadDensity2 = pstData->nReadDensity;
+            (*itr->second).fAvgQScore2 = pstData->fAvgQScore;
+        }        
+
+        delete pstKey; delete pstData;  
+    }
+}
+
+
+void OutputSNPData()
+{
+    fprintf(g_pfCommon,"Chr\tOffset\tAllele\tSNP_Density_1\tSNP_Density_2\t"
+                       "Total_SNP_ Density\tRead_Density_1\tRead_Density_2\t"
+                       "Total_Read_Density\tAVQS_1\tAVQS_2\tAVQS\tdbSNP\tRS\n");
+      
+    fprintf(g_pfUnique1,"Chr\tOffset\tAllele\tSNP_Density_1\tSNP_Density_2\t"
+                        "Total_SNP_ Density\tRead_Density_1\tRead_Density_2\t"
+                        "Total_Read_Density\tAVQS_1\tAVQS_2\tAVQS\tdbSNP\tRS\n");
+
+    fprintf(g_pfUnique2,"Chr\tOffset\tAllele\tSNP_Density_1\tSNP_Density_2\t"
+                        "Total_SNP_ Density\tRead_Density_1\tRead_Density_2\t"
+                        "Total_Read_Density\tAVQS_1\tAVQS_2\tAVQS\tdbSNP\tRS\n");
+
+    AnalyseSNPData();
+
+    fprintf(stdout,"OutputSNPData\n"); 
+    int nTotalSNPCnt, nTotalReadDensity, nReadStrength;      
+    FILE *pf=NULL; SNP_LIST::iterator itr = g_SNPList.begin();
+    unsigned long ulTest1,ulTest2; ulTest1=ulTest2=0;  
+
+    while(itr!=g_SNPList.end())
+    {
+        ulTest1++;
+        if (ulTest1 == 1000000)
+        {
+            ulTest2++;
+            fprintf(stderr,"Total Recs Processed = %u M\n", ulTest2);
+            ulTest1=0;
+        }
+
+        pf = ((*itr->second).bUnique)? g_pfUnique1 : g_pfCommon;
+
+        if ((*itr->first).cChromosome < 23) fprintf(pf,"%d\t",(*itr->first).cChromosome);
+        else if((*itr->first).cChromosome == 23) fprintf(pf,"X\t");
+        else fprintf(pf,"Y\t");
+
+        if ((*itr->second).bUnique)
+        {
+            if ((*itr->second).nReadDensity==0) nReadStrength = 101;
+            else nReadStrength = (int)(((float)(*itr->second).nSNPCnt*100/(float)(*itr->second).nReadDensity)+0.5);
+
+            fprintf(g_pfUnique1,"%d\t%s\t%d\t-\t%d\t%d\t-\t%d\t%.2f\t-\t%.2f\t%s\t%d\n",
+            (*itr->first).nOffset,(*itr->first).acAllele,(*itr->second).nSNPCnt,
+            (*itr->second).nSNPCnt,(*itr->second).nReadDensity,
+            (*itr->second).nReadDensity,(*itr->second).fAvgQScore,
+            (*itr->second).fAvgQScore,(*itr->second).pcdbSNP,nReadStrength);
+            //(int)((*itr->second).nSNPCnt*100/(*itr->second).nReadDensity+0.5));
+        }
+        else
+        {
+            nTotalSNPCnt = (*itr->second).nSNPCnt + (*itr->second).nSNPCnt2;  
+            nTotalReadDensity = (*itr->second).nReadDensity+(*itr->second).nReadDensity2;
+
+            if (nTotalReadDensity == 0) nReadStrength = 101;
+            else nReadStrength = (int)(((float)nTotalSNPCnt*100/(float)nTotalReadDensity)+0.5); 
+
+            fprintf(g_pfCommon,"%d\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%.2f\t%.2f\t%.2f\t%s\t%d\n",
+                (*itr->first).nOffset,(*itr->first).acAllele,
+                (*itr->second).nSNPCnt,(*itr->second).nSNPCnt2,nTotalSNPCnt,
+                (*itr->second).nReadDensity,(*itr->second).nReadDensity2,nTotalReadDensity,
+                (*itr->second).fAvgQScore,(*itr->second).fAvgQScore2,
+                ((*itr->second).fAvgQScore+(*itr->second).fAvgQScore2)/2,
+                (*itr->second).pcdbSNP,nReadStrength); //(int)(((float)nTotalSNPCnt*100/(float)nTotalReadDensity)+0.5));
+        }
+        itr++; 
+    }
+}
+
+
+int main(int argc, char** argv) {
+
+    /*
+    <Input file name 1> <Input file name 2> <Output file name 1 - common data >
+    <Output file name 2 - Unique data set 1> <Output file name 3 - Unique data set 2>
+   */
+
+    if (argc < 6)
+    {
+       fprintf(stdout,"Invalid Parameters...\n");  
+       fprintf(stdout,"Usage:-\n");
+       fprintf(stdout,"\t<Input filename 1> <Input filename 2> <Output filename 1 - common data > ");
+       fprintf(stdout,"<Output filename 2 - Unique data set 1> <Output filename 3 - Unique data set 2>\n\n");
+       exit(9);   
+    }
+
+    g_pfFile1=g_pfFile1=g_pfCommon=g_pfUnique1=g_pfUnique2=NULL;
+
+    g_pfFile1 = fopen(argv[1],"r");
+    if (!g_pfFile1) {fprintf(stdout,"Failed to open %s ...",argv[1]); goto ExitRtn;}
+
+    g_pfFile2 = fopen(argv[2],"r");
+    if (!g_pfFile2) {fprintf(stdout,"Failed to open %s ...",argv[2]); goto ExitRtn;}
+
+    g_pfCommon = fopen(argv[3],"w");
+    if (!g_pfCommon) {fprintf(stdout,"Failed to open %s ...",argv[3]); goto ExitRtn;}
+
+    g_pfUnique1 = fopen(argv[4],"w");
+    if (!g_pfUnique1) {fprintf(stdout,"Failed to open %s ...",argv[4]); goto ExitRtn;}
+
+    g_pfUnique2 = fopen(argv[5],"w");
+    if (!g_pfUnique2) {fprintf(stdout,"Failed to open %s ...",argv[5]); goto ExitRtn;}
+
+    GenerateSNPList(); OutputSNPData();
+
+ ExitRtn:
+    if (g_pfFile1) fclose (g_pfFile1); 
+    if (g_pfFile2) fclose (g_pfFile2);
+    if (g_pfCommon) fclose (g_pfCommon);
+    if (g_pfUnique1) fclose (g_pfUnique1); 
+    if (g_pfUnique2) fclose (g_pfUnique2);
+
+    g_SNPList.clear();
+
+    return (EXIT_SUCCESS);
+}
+

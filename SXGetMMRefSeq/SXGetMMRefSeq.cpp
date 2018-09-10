@@ -1,0 +1,46 @@
+/* 
+ * File:   main.cpp
+ * Author: Manish
+ *
+ * Created on April 13, 2010, 11:32 AM
+ */
+
+#include "GetMMRefSeq.h"
+
+/*
+ * 
+ */
+
+
+static void banner(int argc, char *argv[])
+{
+	fprintf(stdout,"Synamatix SXGetMMRefSeq Copyright 2010 Synamatix Sdn Bhd\n");
+	fprintf(stdout,"Built %s %s\n", __DATE__, __TIME__);
+	fprintf(stdout,"Usage: %s \n",argv[0]);
+        fprintf(stdout,"\t-SV [Structure Variation] <Input file name> <Human Ref. files path> <Output file name> <Size>\n");
+        fprintf(stdout,"\t-SID [SNP,INDEL] <Input file name> <Mus Musculus Ref. files path> <Output file name> <Size>\n");
+}
+
+
+int main(int argc, char** argv) {
+
+
+    if (argc < 6) {
+        banner(argc,argv);
+	exit(9);
+    }
+
+    GetMMRefSeq* pObj = new GetMMRefSeq;
+
+    if  (strcmp(argv[1],"-SV")==0)
+        pObj->run_SV(argv[2],argv[3],argv[4],abs(atoi(argv[5])));
+    else if  (strcmp(argv[1],"-SID")==0)
+        pObj->run_SnpIndel(argv[2],argv[3],argv[4],abs(atoi(argv[5])));
+    else
+        banner(argc,argv);
+
+    if (pObj) delete pObj;
+
+    return (EXIT_SUCCESS);
+}
+

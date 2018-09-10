@@ -1,0 +1,78 @@
+/* 
+ * File:   main.cpp
+ * Author: Manish
+ *
+ * Created on March 16, 2010, 11:04 AM
+ */
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+/*
+ * 
+ */
+int main(int argc, char** argv) {
+
+    if (argc < 3)
+    {
+        fprintf(stdout,"Parameters not sufficient...\n");
+        fprintf(stdout,"Usage: %s\n",argv[0]);
+        fprintf(stdout,"\t<Input filename> <Output filename> <Min. Supporting Reads>\n");
+        exit(9);
+    }
+    FILE *pfIn, *pfOut;
+
+    pfIn = fopen(argv[1],"r"); if (!pfIn) {fprintf(stdout,"Failed to open %s ...\n",argv[1]); exit(9);}
+    pfOut = fopen(argv[2],"w");if (!pfOut) {fprintf(stdout,"Failed to open %s ...\n",argv[2]); exit(9);}
+
+    unsigned int unMinSR = atoi(argv[3]);
+
+    char acbuf[1024]; char *pChr=NULL; short nTabCnt=0;
+    unsigned long ulTest1,ulTest2; ulTest1=ulTest2=0;
+
+    while (!feof(pfIn))
+    {
+        ulTest1++;
+        if (ulTest1 == 1000000)
+        {
+            ulTest2++;
+            fprintf(stdout,"Total Recs Processed = %uM\n", ulTest2);
+            ulTest1=0;
+        }
+
+        if (!fgets(acbuf, sizeof(acbuf),pfIn)) break;
+
+        pChr = strchr(acbuf,'\n'); if (pChr) {*pChr='\0';}
+
+        if (acbuf[0] == '\n'||acbuf[0] == '\r'){
+           fprintf(pfOut,"\n"); fprintf(pfOut,"\n"); continue;
+        }
+
+        if (acbuf[0] == '#'||acbuf[0] == 'C'){
+           fprintf(pfOut,"%s\n",acbuf);continue;
+        }
+
+        pChr = strchr(acbuf,'\t');
+        if (!pChr) continue;
+
+        nTabCnt=0;
+        do
+        {
+            pChr = strchr(pChr+1,'\t');
+            nTabCnt++;
+        } while (nTabCnt < 4); //2);
+        
+        if (atoi(pChr) < unMinSR) continue;
+        fprintf(pfOut,"%s\n",acbuf);
+    }
+
+    if (pfIn) fclose(pfIn);
+    if (pfOut) fclose(pfOut);
+
+
+
+    return (EXIT_SUCCESS);
+
+}
+
